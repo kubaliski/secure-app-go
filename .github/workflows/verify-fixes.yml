@@ -60,33 +60,32 @@ jobs:
           name: fixed-report
           path: reports
       - name: Show comparison
+        shell: python3
         run: |
-          echo "## SecureApp - Verificacion de Correcciones" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Version Vulnerable" >> $GITHUB_STEP_SUMMARY
-          python3 -c "
-import json
-with open('reports/vuln-report.json') as f:
-    d = json.load(f)
-results = d.get('results', [])
-print(f'| Hallazgos | {len(results)} |')
-print(f'|-----------|-------|')
-for r in results:
-    path = r.get('path','')
-    line = r.get('start',{}).get('line','')
-    msg = r.get('extra',{}).get('message','')[:80]
-    print(f'| {path}:{line} | {msg} |')
-" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Version Corregida" >> $GITHUB_STEP_SUMMARY
-          python3 -c "
-import json
-with open('reports/fixed-report.json') as f:
-    d = json.load(f)
-count = len(d.get('results', []))
-print(f'**Hallazgos: {count}**')
-if count == 0:
-    print('✅ Todas las vulnerabilidades han sido corregidas')
-else:
-    print('⚠️ Quedan hallazgos pendientes')
-" >> $GITHUB_STEP_SUMMARY
+          import json, os
+          with open('reports/vuln-report.json') as f:
+              vuln = json.load(f)
+          with open('reports/fixed-report.json') as f:
+              fixed = json.load(f)
+          nvuln = len(vuln.get('results', []))
+          nfixed = len(fixed.get('results', []))
+          summary = f"""## SecureApp - Verificacion de Correcciones
+
+          ### Version Vulnerable
+          **Hallazgos: {nvuln}**
+          """
+          for r in vuln.get('results', []):
+              p = r.get('path','')
+              l = r.get('start',{}).get('line','')
+              m = r.get('extra',{}).get('message','')[:80]
+              summary += f'- {p}:{l} - {m}\n'
+          summary += f"""
+          ### Version Corregida
+          **Hallazgos: {nfixed}**
+          """
+          if nfixed == 0:
+              summary += '✅ Todas las vulnerabilidades han sido corregidas'
+          else:
+              summary += '⚠️ Quedan hallazgos pendientes'
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write(summary)
