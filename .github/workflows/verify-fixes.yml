@@ -84,8 +84,8 @@ jobs:
           **Hallazgos: {nfixed}**
           """
           if nfixed == 0:
-              summary += '✅ Todas las vulnerabilidades han sido corregidas'
+              summary += 'OK - Todas las vulnerabilidades han sido corregidas'
           else:
-              summary += '⚠️ Quedan hallazgos pendientes'
+              summary += 'ATENCION - Quedan hallazgos pendientes'
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
               out.write(summary)
