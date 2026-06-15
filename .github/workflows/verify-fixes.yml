@@ -67,9 +67,11 @@ jobs:
           go-version: "1.26"
       - name: Build and run vulnerable app
         run: |
-          cd vulnerable && go build -o /tmp/vuln-app . && cd ..
+          cd vulnerable && go build -v -o /tmp/vuln-app . 2>&1
+          echo "Binary size: $(ls -lh /tmp/vuln-app | awk '{print $5}')"
           /tmp/vuln-app &
           sleep 5
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/login || echo "App not responding yet"
       - name: ZAP baseline scan
         run: |
           docker run --rm --network host \
@@ -94,9 +96,11 @@ jobs:
           go-version: "1.26"
       - name: Build and run fixed app
         run: |
-          cd fixed && go build -o /tmp/fixed-app . && cd ..
+          cd fixed && go build -v -o /tmp/fixed-app . 2>&1
+          echo "Binary size: $(ls -lh /tmp/fixed-app | awk '{print $5}')"
           /tmp/fixed-app &
           sleep 5
+          curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/login || echo "App not responding yet"
       - name: ZAP baseline scan
         run: |
           docker run --rm --network host \
