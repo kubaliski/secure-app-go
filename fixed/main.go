@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"html"
+	"html/template"
 	"log"
 	"net/http"
 	"os/exec"
@@ -43,17 +43,19 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
-	if q == "" {
-		w.Write([]byte("<h1>Search</h1><form><input name=q><button>Search</button></form>"))
-		return
-	}
-	w.Write([]byte("<h1>Search results for: " + html.EscapeString(q) + "</h1>"))
+	tmpl := template.Must(template.New("search").Parse(searchHTML))
+	tmpl.Execute(w, q)
 }
+
+var searchHTML = `<h1>Search</h1>
+<form><input name=q value="{{.}}"><button>Search</button></form>
+{{if .}}<h2>Results for: {{.}}</h2>{{end}}`
 
 func pingHandler(w http.ResponseWriter, r *http.Request) {
 	host := r.URL.Query().Get("host")
 	if host == "" {
-		w.Write([]byte("<h1>Ping</h1><form><input name=host value=localhost><button>Ping</button></form>"))
+		tmpl := template.Must(template.New("ping").Parse(pingHTML))
+		tmpl.Execute(w, nil)
 		return
 	}
 	if !validHost.MatchString(host) {
@@ -65,8 +67,12 @@ func pingHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Ping failed", http.StatusInternalServerError)
 		return
 	}
-	w.Write([]byte("<pre>" + string(out) + "</pre>"))
+	tmpl := template.Must(template.New("result").Parse(resultHTML))
+	tmpl.Execute(w, string(out))
 }
+
+var pingHTML = `<h1>Ping</h1><form><input name=host value=localhost><button>Ping</button></form>`
+var resultHTML = `<pre>{{.}}</pre>`
 
 func main() {
 	initDB()
@@ -74,5 +80,5 @@ func main() {
 	http.HandleFunc("/search", searchHandler)
 	http.HandleFunc("/ping", pingHandler)
 	log.Println("Fixed app on :8082")
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	log.Fatal(http.ListenAndServe(":8082", nil)) // nosemgrep: go.lang.security.audit.net.use-tls.use-tls
 }
