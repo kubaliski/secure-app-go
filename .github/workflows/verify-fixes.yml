@@ -17,13 +17,12 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - name: Scan vulnerable version
+      - name: Scan
         run: |
           docker run --rm -v $(pwd):/src \
             returntocorp/semgrep:latest \
             semgrep scan --config=auto --json /src/vulnerable > vuln-report.json || true
-      - name: Upload report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: vuln-report
           path: vuln-report.json
@@ -34,13 +33,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Scan fixed version
+      - name: Scan
         run: |
           docker run --rm -v $(pwd):/src \
             returntocorp/semgrep:latest \
             semgrep scan --config=auto --json /src/fixed > fixed-report.json || true
-      - name: Upload report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: fixed-report
           path: fixed-report.json
@@ -58,10 +56,65 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  dast-vulnerable:
+    name: DAST - Vulnerable (ZAP)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Build and run vulnerable app
+        run: |
+          go build -o /tmp/vuln-app ./vulnerable
+          /tmp/vuln-app &
+          sleep 3
+      - name: ZAP baseline scan
+        run: |
+          docker run --rm --network host \
+            -v $(pwd):/zap/wrk \
+            -u root \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:8081/login \
+            -r /zap/wrk/zap-vuln-report.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zap-vuln-report
+          path: zap-vuln-report.html
+        if: always()
+
+  dast-fixed:
+    name: DAST - Fixed (ZAP)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - name: Build and run fixed app
+        run: |
+          go build -o /tmp/fixed-app ./fixed
+          /tmp/fixed-app &
+          sleep 3
+      - name: ZAP baseline scan
+        run: |
+          docker run --rm --network host \
+            -v $(pwd):/zap/wrk \
+            -u root \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py -t http://localhost:8082/login \
+            -r /zap/wrk/zap-fixed-report.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zap-fixed-report
+          path: zap-fixed-report.html
+        if: always()
+
   compare:
     name: Compare Results
     runs-on: ubuntu-latest
-    needs: [sast-vulnerable, sast-fixed]
+    needs: [sast-vulnerable, sast-fixed, dast-vulnerable, dast-fixed]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
