@@ -1,0 +1,92 @@
+name: Verify Fixes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  semgrep-vulnerable:
+    name: Semgrep - Vulnerable
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan vulnerable version
+        run: |
+          docker run --rm -v $(pwd):/src \
+            returntocorp/semgrep:latest \
+            semgrep scan --config=auto --output=/src/vuln-report.json /src/vulnerable
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: vuln-report
+          path: vuln-report.json
+        if: always()
+
+  semgrep-fixed:
+    name: Semgrep - Fixed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan fixed version
+        run: |
+          docker run --rm -v $(pwd):/src \
+            returntocorp/semgrep:latest \
+            semgrep scan --config=auto --output=/src/fixed-report.json /src/fixed
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixed-report
+          path: fixed-report.json
+        if: always()
+
+  compare:
+    name: Compare Results
+    runs-on: ubuntu-latest
+    needs: [semgrep-vulnerable, semgrep-fixed]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vuln-report
+          path: reports
+      - uses: actions/download-artifact@v4
+        with:
+          name: fixed-report
+          path: reports
+      - name: Show comparison
+        run: |
+          echo "## SecureApp - Verificacion de Correcciones" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Version Vulnerable" >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+import json
+with open('reports/vuln-report.json') as f:
+    d = json.load(f)
+results = d.get('results', [])
+print(f'| Hallazgos | {len(results)} |')
+print(f'|-----------|-------|')
+for r in results:
+    path = r.get('path','')
+    line = r.get('start',{}).get('line','')
+    msg = r.get('extra',{}).get('message','')[:80]
+    print(f'| {path}:{line} | {msg} |')
+" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Version Corregida" >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+import json
+with open('reports/fixed-report.json') as f:
+    d = json.load(f)
+count = len(d.get('results', []))
+print(f'**Hallazgos: {count}**')
+if count == 0:
+    print('✅ Todas las vulnerabilidades han sido corregidas')
+else:
+    print('⚠️ Quedan hallazgos pendientes')
+" >> $GITHUB_STEP_SUMMARY
