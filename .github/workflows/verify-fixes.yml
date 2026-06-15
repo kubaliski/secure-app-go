@@ -78,8 +78,7 @@ jobs:
             -v $(pwd):/zap/wrk \
             -u root \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:8081/login \
-            -r /zap/wrk/zap-vuln-report.html
+            bash -c "zap-baseline.py -t http://localhost:8081/login -r /tmp/zap.html; cp /tmp/zap.html /zap/wrk/zap-vuln-report.html || true"
       - uses: actions/upload-artifact@v4
         with:
           name: zap-vuln-report
@@ -107,8 +106,7 @@ jobs:
             -v $(pwd):/zap/wrk \
             -u root \
             ghcr.io/zaproxy/zaproxy:stable \
-            zap-baseline.py -t http://localhost:8082/login \
-            -r /zap/wrk/zap-fixed-report.html
+            bash -c "zap-baseline.py -t http://localhost:8082/login -r /tmp/zap.html; cp /tmp/zap.html /zap/wrk/zap-fixed-report.html || true"
       - uses: actions/upload-artifact@v4
         with:
           name: zap-fixed-report
