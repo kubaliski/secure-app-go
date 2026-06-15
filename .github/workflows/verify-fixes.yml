@@ -11,8 +11,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  semgrep-vulnerable:
-    name: Semgrep - Vulnerable
+  sast-vulnerable:
+    name: SAST - Vulnerable
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -29,8 +29,8 @@ jobs:
           path: vuln-report.json
         if: always()
 
-  semgrep-fixed:
-    name: Semgrep - Fixed
+  sast-fixed:
+    name: SAST - Fixed
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,10 +46,22 @@ jobs:
           path: fixed-report.json
         if: always()
 
+  secrets:
+    name: Secrets - Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   compare:
     name: Compare Results
     runs-on: ubuntu-latest
-    needs: [semgrep-vulnerable, semgrep-fixed]
+    needs: [sast-vulnerable, sast-fixed]
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -60,8 +72,8 @@ jobs:
           name: fixed-report
           path: reports
       - name: Show comparison
-        shell: python3
         run: |
+          python3 << 'EOF'
           import json, os
           with open('reports/vuln-report.json') as f:
               vuln = json.load(f)
@@ -69,23 +81,18 @@ jobs:
               fixed = json.load(f)
           nvuln = len(vuln.get('results', []))
           nfixed = len(fixed.get('results', []))
-          summary = f"""## SecureApp - Verificacion de Correcciones
-
-          ### Version Vulnerable
-          **Hallazgos: {nvuln}**
-          """
+          summary = "## SecureApp - Verificacion de Correcciones\n\n"
+          summary += "### Version Vulnerable\n**Hallazgos: " + str(nvuln) + "**\n"
           for r in vuln.get('results', []):
               p = r.get('path','')
               l = r.get('start',{}).get('line','')
               m = r.get('extra',{}).get('message','')[:80]
-              summary += f'- {p}:{l} - {m}\n'
-          summary += f"""
-          ### Version Corregida
-          **Hallazgos: {nfixed}**
-          """
+              summary += "- " + p + ":" + str(l) + " - " + m + "\n"
+          summary += "\n### Version Corregida\n**Hallazgos: " + str(nfixed) + "**\n"
           if nfixed == 0:
-              summary += 'OK - Todas las vulnerabilidades han sido corregidas'
+              summary += "OK - Todas las vulnerabilidades han sido corregidas\n"
           else:
-              summary += 'ATENCION - Quedan hallazgos pendientes'
+              summary += "ATENCION - Quedan hallazgos pendientes\n"
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
               out.write(summary)
+          EOF
