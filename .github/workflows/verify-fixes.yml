@@ -21,7 +21,7 @@ jobs:
         run: |
           docker run --rm -v $(pwd):/src \
             returntocorp/semgrep:latest \
-            semgrep scan --config=auto --output=/src/vuln-report.json /src/vulnerable
+            semgrep scan --config=auto --json /src/vulnerable > vuln-report.json || true
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
@@ -38,7 +38,7 @@ jobs:
         run: |
           docker run --rm -v $(pwd):/src \
             returntocorp/semgrep:latest \
-            semgrep scan --config=auto --output=/src/fixed-report.json /src/fixed
+            semgrep scan --config=auto --json /src/fixed > fixed-report.json || true
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
