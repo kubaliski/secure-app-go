@@ -72,27 +72,4 @@ jobs:
           name: fixed-report
           path: reports
       - name: Show comparison
-        run: |
-          python3 << 'EOF'
-          import json, os
-          with open('reports/vuln-report.json') as f:
-              vuln = json.load(f)
-          with open('reports/fixed-report.json') as f:
-              fixed = json.load(f)
-          nvuln = len(vuln.get('results', []))
-          nfixed = len(fixed.get('results', []))
-          summary = "## SecureApp - Verificacion de Correcciones\n\n"
-          summary += "### Version Vulnerable\n**Hallazgos: " + str(nvuln) + "**\n"
-          for r in vuln.get('results', []):
-              p = r.get('path','')
-              l = r.get('start',{}).get('line','')
-              m = r.get('extra',{}).get('message','')[:80]
-              summary += "- " + p + ":" + str(l) + " - " + m + "\n"
-          summary += "\n### Version Corregida\n**Hallazgos: " + str(nfixed) + "**\n"
-          if nfixed == 0:
-              summary += "OK - Todas las vulnerabilidades han sido corregidas\n"
-          else:
-              summary += "ATENCION - Quedan hallazgos pendientes\n"
-          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
-              out.write(summary)
-          EOF
+        run: python3 .github/scripts/compare_reports.py
